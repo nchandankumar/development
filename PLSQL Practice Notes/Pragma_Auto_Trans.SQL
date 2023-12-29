@@ -1,0 +1,108 @@
+CREATE OR REPLACE PROCEDURE UPDATE_SAL(E IN NUMBER) IS
+PRAGMA AUTONOMOUS_TRANSACTION;
+BEGIN
+UPDATE PRAGMA_EMP SET SAL = SAL+1000 WHERE EMP_ID =E;
+ROLLBACK;
+END UPDATE_SAL;
+/
+
+SHOW ERRORS;
+BEGIN
+UPDATE PRAGMA_EMP SET SAL = SAL+1000 WHERE EMP_ID =1001;
+UPDATE_SAL(1002);
+COMMIT;
+END;
+/
+
+CREATE TABLE CK_PRAGMA_EMP_RAW(
+EMPID NUMBER(5) PRIMARY KEY,
+EMPNAME VARCHAR(20) ,
+EMPDEPT VARCHAR2(30),
+EMPSAL NUMBER(8,2),
+EMPROLE VARCHAR2(20),
+EMPLOC VARCHAR2(5)
+);
+
+CREATE TABLE CK_PRAGMA_EMP_MASTER(
+EMPID NUMBER(5) PRIMARY KEY,
+EMPNAME VARCHAR(20) ,
+EMPDEPT VARCHAR2(10),
+EMPSAL NUMBER(8,2),
+EMPROLE VARCHAR2(20),
+EMPLOC VARCHAR2(5)
+);
+
+CREATE TABLE ERROR_LOGS (
+    LOG_ID NUMBER GENERATED ALWAYS AS IDENTITY,
+    ERROR_TIMESTAMP TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ERROR_MESSAGE VARCHAR2(1000)
+);
+
+CREATE OR REPLACE PROCEDURE LOG_ERROR(ERROR_MSG IN ERROR_LOGS.ERROR_MESSAGE%TYPE) IS
+PRAGMA AUTONOMOUS_TRANSACTION;
+BEGIN
+INSERT INTO error_logs (error_message)
+    VALUES (error_msg);
+    COMMIT;
+END LOG_ERROR;
+
+CREATE OR REPLACE PROCEDURE VALIDATE_AND_INSERT_EMPLOYEES IS
+    PRAGMA AUTONOMOUS_TRANSACTION;
+    V_ERROR_COUNT NUMBER := 0;
+    V_NAME VARCHAR2(100);
+BEGIN
+    -- Validate and insert data into employee_master table
+    FOR EMP_REC IN (SELECT * FROM CK_PRAGMA_EMP_RAW) LOOP
+        BEGIN
+            -- Validation rules (example: salary should not be negative)
+            IF EMP_REC.EMPSAL <= 0 THEN
+                -- If validation fails, raise an error
+                V_ERROR_COUNT := V_ERROR_COUNT + 1;
+                LOG_ERROR('Negative salary found for employee ID: ' || EMP_REC.EMPID);
+                -- INSERT INTO ERROR_LOGS (ERROR_MESSAGE)
+                -- VALUES ('Negative salary found for employee ID: ' || EMP_REC.EMPID);
+            ELSE
+                -- If validation passes, insert into employee_master table
+                INSERT INTO CK_PRAGMA_EMP_MASTER(EMPID, EMPNAME, EMPDEPT, EMPSAL, EMPROLE,EMPLOC)
+                VALUES (EMP_REC.EMPID, EMP_REC.EMPNAME, EMP_REC.EMPDEPT, EMP_REC.EMPSAL, EMP_REC.EMPROLE, EMP_REC.EMPLOC);
+            END IF;
+        EXCEPTION
+            WHEN OTHERS THEN
+                -- SELECT 'CHANDAN' INTO V_NAME FROM DUAL;
+                V_ERROR_COUNT := V_ERROR_COUNT + 1;
+                LOG_ERROR('Error processing employee ID: ' || EMP_REC.EMPID || '. ' || SQLERRM);
+                -- INSERT INTO ERROR_LOGS (ERROR_MESSAGE)
+                -- VALUES ('Error processing employee ID: ' || EMP_REC.EMPID || '. ' || SQLERRM);
+        END;
+    END LOOP;
+    
+    -- If errors occurred during processing, rollback the transaction
+    IF V_ERROR_COUNT > 0 THEN
+        ROLLBACK;
+    ELSE
+        COMMIT; -- Commit the changes made in the autonomous transaction
+    END IF;
+    
+    -- Display the total number of errors found
+    DBMS_OUTPUT.PUT_LINE('Total Errors: ' || v_error_count);
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        DBMS_OUTPUT.PUT_LINE('An error occurred: ' || SQLERRM);
+END VALIDATE_AND_INSERT_EMPLOYEES;
+/
+
+
+
+SHOW ERRORS;
+BEGIN
+VALIDATE_AND_INSERT_EMPLOYEES;
+END;
+/
+
+
+SELECT * FROM ERROR_LOGS;
+truncate table error_logs;
+SELECT * FROM CK_PRAGMA_EMP_MASTER;
+
+TRUNCATE TABLE CK_PRAGMA_EMP_MASTER;

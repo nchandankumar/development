@@ -1,0 +1,5 @@
+-- 1. write a program to insert employee’s annual salary having more than 15 Lakhs per month into table.
+-- 2. Write a program to insert employee’s working in the location New York and Sal grade 3 employees.
+-- 3. Write a program to insert employee’s having experience between 3 to 5 and working as clerks.
+-- 4. Write a program to insert employee’s having same names and having experience between less than a year.
+-- 5. Write a program to insert managers having more than 5 employees and having at least two Sales persons in a team and Sales persons hired in the years between 1976 and 1981
